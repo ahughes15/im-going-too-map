@@ -331,31 +331,31 @@ container.appendChild(renderer.domElement);
 const globeGroup = new THREE.Group();
 scene.add(globeGroup);
 
-// Real Earth texture as the base sphere
-const textureLoader = new THREE.TextureLoader();
-const earthTexture = textureLoader.load(
-  'https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/planets/earth_atmos_2048.jpg'
-);
-
+// Abstract sphere, no photorealistic texture. A solid dark core plus
+// a bold, evenly-spaced graticule (latitude/longitude grid), closer to
+// a vintage technical/astronomy diagram than a literal Earth. Structure
+// and signal only, nothing decorative.
 const sphereGeo = new THREE.SphereGeometry(RADIUS, 48, 32);
-const sphereMat = new THREE.MeshBasicMaterial({ map: earthTexture });
-const earthSphere = new THREE.Mesh(sphereGeo, sphereMat);
-globeGroup.add(earthSphere);
+const sphereMat = new THREE.MeshBasicMaterial({ color: 0x0B0E17 });
+const coreSphere = new THREE.Mesh(sphereGeo, sphereMat);
+globeGroup.add(coreSphere);
 
-// Faint wireframe grid layered just above the surface, keeps the
-// "data instrument" feel without hiding the real geography underneath
-const gridGeo = new THREE.SphereGeometry(RADIUS + 0.008, 24, 16);
+// Bold graticule, deliberately low segment count so it reads as a
+// designed diagram (clean meridians/parallels) rather than a dense mesh
+const gridGeo = new THREE.SphereGeometry(RADIUS + 0.006, 18, 10);
 const gridMat = new THREE.MeshBasicMaterial({
   color: 0x2F5EFF,
   wireframe: true,
   transparent: true,
-  opacity: 0.18,
+  opacity: 0.55,
 });
 const wireGrid = new THREE.Mesh(gridGeo, gridMat);
 globeGroup.add(wireGrid);
 
-// City markers
-const markerGeo = new THREE.SphereGeometry(0.035, 12, 12);
+// City markers, bold flat circles with a thin outline ring, more graphic
+// mark than realistic pin
+const markerGeo = new THREE.SphereGeometry(0.042, 16, 16);
+const markerRingGeo = new THREE.RingGeometry(0.058, 0.066, 24);
 const markers = [];
 
 CITIES.forEach((city) => {
@@ -366,6 +366,18 @@ CITIES.forEach((city) => {
   marker.userData = { city, baseScale: 1 };
   globeGroup.add(marker);
   markers.push(marker);
+
+  // Thin outline ring, faces outward from the sphere center
+  const ringMat = new THREE.MeshBasicMaterial({
+    color: 0xFF3B81,
+    transparent: true,
+    opacity: 0.5,
+    side: THREE.DoubleSide,
+  });
+  const ring = new THREE.Mesh(markerRingGeo, ringMat);
+  ring.position.copy(pos);
+  ring.lookAt(pos.clone().multiplyScalar(2));
+  globeGroup.add(ring);
 });
 
 // Interaction state
