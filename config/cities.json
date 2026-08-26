@@ -1,0 +1,19 @@
+[
+  { "id": "london", "name": "London", "country": "United Kingdom", "spotify_market": "GB", "reddit_sub": "london", "trends_geo": "GB" },
+  { "id": "la", "name": "Los Angeles", "country": "United States", "spotify_market": "US", "reddit_sub": "LosAngeles", "trends_geo": "US-CA" },
+  { "id": "rio", "name": "Rio de Janeiro", "country": "Brazil", "spotify_market": "BR", "reddit_sub": "riodejaneiro", "trends_geo": "BR" },
+  { "id": "mexico_city", "name": "Mexico City", "country": "Mexico", "spotify_market": "MX", "reddit_sub": "mexicocity", "trends_geo": "MX" },
+  { "id": "honolulu", "name": "Honolulu", "country": "United States", "spotify_market": "US", "reddit_sub": "Honolulu", "trends_geo": "US-HI" },
+  { "id": "tokyo", "name": "Tokyo", "country": "Japan", "spotify_market": "JP", "reddit_sub": "tokyo", "trends_geo": "JP" },
+  { "id": "seoul", "name": "Seoul", "country": "South Korea", "spotify_market": "KR", "reddit_sub": "seoul", "trends_geo": "KR" },
+  { "id": "cape_town", "name": "Cape Town", "country": "South Africa", "spotify_market": "ZA", "reddit_sub": "CapeTown", "trends_geo": "ZA" },
+  { "id": "barcelona", "name": "Barcelona", "country": "Spain", "spotify_market": "ES", "reddit_sub": "Barcelona", "trends_geo": "ES" },
+  { "id": "mumbai", "name": "Mumbai", "country": "India", "spotify_market": "IN", "reddit_sub": "mumbai", "trends_geo": "IN" },
+  { "id": "dubai", "name": "Dubai", "country": "United Arab Emirates", "spotify_market": "AE", "reddit_sub": "dubai", "trends_geo": "AE" },
+  { "id": "bangkok", "name": "Bangkok", "country": "Thailand", "spotify_market": "TH", "reddit_sub": "Bangkok", "trends_geo": "TH" },
+  { "id": "lagos", "name": "Lagos", "country": "Nigeria", "spotify_market": "NG", "reddit_sub": "lagos", "trends_geo": "NG" },
+  { "id": "hong_kong", "name": "Hong Kong", "country": "Hong Kong", "spotify_market": "HK", "reddit_sub": "HongKong", "trends_geo": "HK" },
+  { "id": "sydney", "name": "Sydney", "country": "Australia", "spotify_market": "AU", "reddit_sub": "sydney", "trends_geo": "AU" },
+  { "id": "new_york", "name": "New York", "country": "United States", "spotify_market": "US", "reddit_sub": "AskNYC", "trends_geo": "US-NY" },
+  { "id": "berlin", "name": "Berlin", "country": "Germany", "spotify_market": "DE", "reddit_sub": "berlin", "trends_geo": "DE" }
+]
