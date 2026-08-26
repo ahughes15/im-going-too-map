@@ -295,7 +295,16 @@ let prevMouse = { x: 0, y: 0 };
 let velocity = { x: 0, y: 0 };
 let autoRotate = true;
 let idleTimer = null;
-let targetQuaternion = null; // set when animating the globe to face a selected city
+
+// The globe's orientation is tracked as yaw (spin, free) and pitch (tilt,
+// limited) only, never roll. This keeps "north" always pointing up, so
+// dragging always behaves the way you'd expect no matter what city was
+// last selected.
+let yaw = 0;
+let pitch = 0;
+let targetYaw = null;
+let targetPitch = null;
+const PITCH_LIMIT = 0.45; // radians, ~26 degrees of tilt allowed either way
 
 const raycaster = new THREE.Raycaster();
 const mouseVec = new THREE.Vector2();
@@ -303,7 +312,8 @@ const mouseVec = new THREE.Vector2();
 function onPointerDown(e) {
   isDragging = true;
   autoRotate = false;
-  targetQuaternion = null;
+  targetYaw = null;
+  targetPitch = null;
   prevMouse = { x: e.clientX, y: e.clientY };
   clearTimeout(idleTimer);
 }
@@ -313,9 +323,9 @@ function onPointerMove(e) {
   const dx = e.clientX - prevMouse.x;
   const dy = e.clientY - prevMouse.y;
   velocity = { x: dx * 0.005, y: dy * 0.005 };
-  globeGroup.rotation.y += velocity.x;
-  globeGroup.rotation.x += velocity.y;
-  globeGroup.rotation.x = Math.max(-1.2, Math.min(1.2, globeGroup.rotation.x));
+  yaw += velocity.x;           // free, no limit, this is the main interaction
+  pitch += velocity.y * 0.6;   // slower and limited, secondary interaction
+  pitch = Math.max(-PITCH_LIMIT, Math.min(PITCH_LIMIT, pitch));
   prevMouse = { x: e.clientX, y: e.clientY };
 }
 
@@ -370,19 +380,17 @@ function selectCity(city) {
     cityVibeText.style.color = 'var(--muted)';
   }
 
-  // Rotate globe so this city faces the camera.
-  // Compute the city's direction on the sphere, then find the rotation
-  // that points that direction straight at the camera (+Z). Using a
-  // quaternion here (not manual x/y angles) avoids the wraparound bugs
-  // that caused the wrong-location jumps.
+  // Rotate globe so this city faces the camera, using the same yaw/pitch
+  // (no roll) system as manual dragging, so the two never fight each other.
   const phi = (90 - city.lat) * (Math.PI / 180);
   const theta = (city.lon + 180) * (Math.PI / 180);
-  const cityDir = new THREE.Vector3(
-    -Math.sin(phi) * Math.cos(theta),
-    Math.cos(phi),
-    Math.sin(phi) * Math.sin(theta)
-  ).normalize();
-  targetQuaternion = new THREE.Quaternion().setFromUnitVectors(cityDir, new THREE.Vector3(0, 0, 1));
+  const dir = {
+    x: -Math.sin(phi) * Math.cos(theta),
+    y: Math.cos(phi),
+    z: Math.sin(phi) * Math.sin(theta),
+  };
+  targetPitch = Math.max(-PITCH_LIMIT, Math.min(PITCH_LIMIT, Math.atan2(dir.y, dir.z)));
+  targetYaw = Math.atan2(-dir.x, Math.sqrt(dir.y * dir.y + dir.z * dir.z));
   autoRotate = false;
   clearTimeout(idleTimer);
 }
@@ -418,15 +426,21 @@ function animate() {
   requestAnimationFrame(animate);
 
   if (autoRotate) {
-    globeGroup.rotation.y += 0.0015;
+    yaw += 0.0015;
   }
 
-  if (targetQuaternion) {
-    globeGroup.quaternion.slerp(targetQuaternion, 0.08);
-    if (globeGroup.quaternion.angleTo(targetQuaternion) < 0.001) {
-      targetQuaternion = null;
+  if (targetYaw !== null) {
+    // shortest-path easing, so spinning past 180° doesn't take the long way around
+    let diff = ((targetYaw - yaw + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI;
+    yaw += diff * 0.08;
+    pitch += (targetPitch - pitch) * 0.08;
+    if (Math.abs(diff) < 0.001 && Math.abs(targetPitch - pitch) < 0.001) {
+      targetYaw = null;
+      targetPitch = null;
     }
   }
+
+  globeGroup.rotation.set(pitch, yaw, 0);
 
   velocity.x *= 0.9;
   velocity.y *= 0.9;
