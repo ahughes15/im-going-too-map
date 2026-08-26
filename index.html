@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>City Vibe Map — Prototype</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Inter:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  :root {
+    --bg: #08090C;
+    --cobalt: #2F5EFF;
+    --pink: #FF3B81;
+    --fg: #F2F1EA;
+    --muted: #6B6F76;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: 'Inter', sans-serif;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+  }
+
+  #canvas-container {
+    position: fixed;
+    inset: 0;
+  }
+
+  canvas { display: block; cursor: grab; }
+  canvas:active { cursor: grabbing; }
+
+  .wordmark {
+    position: fixed;
+    top: 28px;
+    left: 32px;
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 500;
+    font-size: 14px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    z-index: 10;
+    pointer-events: none;
+  }
+
+  .wordmark span {
+    color: var(--muted);
+    display: block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    text-transform: none;
+    letter-spacing: 0;
+    margin-top: 4px;
+  }
+
+  .search-wrap {
+    position: fixed;
+    top: 28px;
+    right: 32px;
+    z-index: 10;
+    width: 260px;
+  }
+
+  .search-input {
+    width: 100%;
+    background: rgba(47, 94, 255, 0.08);
+    border: 1px solid rgba(47, 94, 255, 0.4);
+    color: var(--fg);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    padding: 10px 14px;
+    outline: none;
+    letter-spacing: 0.02em;
+  }
+
+  .search-input::placeholder { color: var(--muted); }
+  .search-input:focus { border-color: var(--pink); }
+
+  .search-results {
+    margin-top: 4px;
+    border: 1px solid rgba(47, 94, 255, 0.25);
+    background: rgba(8, 9, 12, 0.95);
+    display: none;
+  }
+
+  .search-results.active { display: block; }
+
+  .search-result-item {
+    padding: 9px 14px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--fg);
+    cursor: pointer;
+    border-bottom: 1px solid rgba(47, 94, 255, 0.12);
+  }
+
+  .search-result-item:last-child { border-bottom: none; }
+  .search-result-item:hover { background: rgba(255, 59, 129, 0.12); color: var(--pink); }
+
+  .corner-tick {
+    position: fixed;
+    width: 16px;
+    height: 16px;
+    border: 1px solid var(--cobalt);
+    opacity: 0.5;
+    z-index: 5;
+    pointer-events: none;
+  }
+  .tick-tl { top: 20px; left: 20px; border-right: none; border-bottom: none; }
+  .tick-tr { top: 20px; right: 20px; border-left: none; border-bottom: none; }
+  .tick-bl { bottom: 20px; left: 20px; border-right: none; border-top: none; }
+  .tick-br { bottom: 20px; right: 20px; border-left: none; border-top: none; }
+
+  .city-panel {
+    position: fixed;
+    bottom: 32px;
+    left: 32px;
+    z-index: 10;
+    width: 320px;
+    background: rgba(8, 9, 12, 0.9);
+    border-left: 2px solid var(--pink);
+    padding: 20px 22px;
+    transform: translateY(24px);
+    opacity: 0;
+    pointer-events: none;
+    transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.4s ease;
+  }
+
+  .city-panel.active { transform: translateY(0); opacity: 1; pointer-events: auto; }
+
+  .city-panel .name {
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 700;
+    font-size: 26px;
+    letter-spacing: -0.01em;
+  }
+
+  .city-panel .coords {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 6px;
+    letter-spacing: 0.02em;
+  }
+
+  .city-panel .placeholder {
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    color: var(--muted);
+    margin-top: 14px;
+    line-height: 1.5;
+    font-style: italic;
+  }
+
+  .hint {
+    position: fixed;
+    bottom: 32px;
+    right: 32px;
+    z-index: 10;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.03em;
+    text-align: right;
+    pointer-events: none;
+  }
+</style>
+</head>
+<body>
+
+<div class="wordmark">City Vibe Map<span>17 cities / live prototype</span></div>
+
+<div class="search-wrap">
+  <input type="text" class="search-input" id="searchInput" placeholder="Search a city..." autocomplete="off">
+  <div class="search-results" id="searchResults"></div>
+</div>
+
+<div class="corner-tick tick-tl"></div>
+<div class="corner-tick tick-tr"></div>
+<div class="corner-tick tick-bl"></div>
+<div class="corner-tick tick-br"></div>
+
+<div class="city-panel" id="cityPanel">
+  <div class="name" id="cityName">—</div>
+  <div class="coords" id="cityCoords">—</div>
+  <div class="placeholder">Vibe read will populate here once the data pipeline is connected.</div>
+</div>
+
+<div class="hint">drag to rotate<br>click a marker to select</div>
+
+<div id="canvas-container"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const CITIES = [
+  { name: "London", lat: 51.5074, lon: -0.1278 },
+  { name: "Los Angeles", lat: 34.0522, lon: -118.2437 },
+  { name: "Rio de Janeiro", lat: -22.9068, lon: -43.1729 },
+  { name: "Mexico City", lat: 19.4326, lon: -99.1332 },
+  { name: "Honolulu", lat: 21.3069, lon: -157.8583 },
+  { name: "Tokyo", lat: 35.6762, lon: 139.6503 },
+  { name: "Seoul", lat: 37.5665, lon: 126.9780 },
+  { name: "Cape Town", lat: -33.9249, lon: 18.4241 },
+  { name: "Barcelona", lat: 41.3851, lon: 2.1734 },
+  { name: "Mumbai", lat: 19.0760, lon: 72.8777 },
+  { name: "Dubai", lat: 25.2048, lon: 55.2708 },
+  { name: "Bangkok", lat: 13.7563, lon: 100.5018 },
+  { name: "Lagos", lat: 6.5244, lon: 3.3792 },
+  { name: "Hong Kong", lat: 22.3193, lon: 114.1694 },
+  { name: "Sydney", lat: -33.8688, lon: 151.2093 },
+  { name: "New York", lat: 40.7128, lon: -74.0060 },
+  { name: "Berlin", lat: 52.5200, lon: 13.4050 },
+];
+
+const RADIUS = 2;
+
+function latLonToVector3(lat, lon, radius) {
+  const phi = (90 - lat) * (Math.PI / 180);
+  const theta = (lon + 180) * (Math.PI / 180);
+  const x = -radius * Math.sin(phi) * Math.cos(theta);
+  const z = radius * Math.sin(phi) * Math.sin(theta);
+  const y = radius * Math.cos(phi);
+  return new THREE.Vector3(x, y, z);
+}
+
+const container = document.getElementById('canvas-container');
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+camera.position.z = 5.5;
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(window.devicePixelRatio);
+container.appendChild(renderer.domElement);
+
+const globeGroup = new THREE.Group();
+scene.add(globeGroup);
+
+// Wireframe sphere
+const sphereGeo = new THREE.SphereGeometry(RADIUS, 28, 20);
+const sphereMat = new THREE.MeshBasicMaterial({
+  color: 0x2F5EFF,
+  wireframe: true,
+  transparent: true,
+  opacity: 0.35,
+});
+const wireSphere = new THREE.Mesh(sphereGeo, sphereMat);
+globeGroup.add(wireSphere);
+
+// Faint solid core to help occlude back-facing markers visually
+const coreGeo = new THREE.SphereGeometry(RADIUS - 0.01, 28, 20);
+const coreMat = new THREE.MeshBasicMaterial({ color: 0x08090C, transparent: true, opacity: 0.85 });
+const core = new THREE.Mesh(coreGeo, coreMat);
+globeGroup.add(core);
+
+// City markers
+const markerGeo = new THREE.SphereGeometry(0.035, 12, 12);
+const markers = [];
+
+CITIES.forEach((city) => {
+  const pos = latLonToVector3(city.lat, city.lon, RADIUS + 0.015);
+  const mat = new THREE.MeshBasicMaterial({ color: 0xFF3B81 });
+  const marker = new THREE.Mesh(markerGeo, mat);
+  marker.position.copy(pos);
+  marker.userData = { city, baseScale: 1 };
+  globeGroup.add(marker);
+  markers.push(marker);
+});
+
+// Interaction state
+let isDragging = false;
+let prevMouse = { x: 0, y: 0 };
+let velocity = { x: 0, y: 0 };
+let autoRotate = true;
+let idleTimer = null;
+let targetRotation = null; // {x, y} when animating to a selected city
+
+const raycaster = new THREE.Raycaster();
+const mouseVec = new THREE.Vector2();
+
+function onPointerDown(e) {
+  isDragging = true;
+  autoRotate = false;
+  targetRotation = null;
+  prevMouse = { x: e.clientX, y: e.clientY };
+  clearTimeout(idleTimer);
+}
+
+function onPointerMove(e) {
+  if (!isDragging) return;
+  const dx = e.clientX - prevMouse.x;
+  const dy = e.clientY - prevMouse.y;
+  velocity = { x: dx * 0.005, y: dy * 0.005 };
+  globeGroup.rotation.y += velocity.x;
+  globeGroup.rotation.x += velocity.y;
+  globeGroup.rotation.x = Math.max(-1.2, Math.min(1.2, globeGroup.rotation.x));
+  prevMouse = { x: e.clientX, y: e.clientY };
+}
+
+function onPointerUp() {
+  isDragging = false;
+  idleTimer = setTimeout(() => { autoRotate = true; }, 2200);
+}
+
+function onClick(e) {
+  if (Math.abs(velocity.x) > 0.01 || Math.abs(velocity.y) > 0.01) return; // ignore click-after-drag
+  mouseVec.x = (e.clientX / window.innerWidth) * 2 - 1;
+  mouseVec.y = -(e.clientY / window.innerHeight) * 2 + 1;
+  raycaster.setFromCamera(mouseVec, camera);
+  const hits = raycaster.intersectObjects(markers);
+  if (hits.length > 0) {
+    selectCity(hits[0].object.userData.city);
+  }
+}
+
+renderer.domElement.addEventListener('pointerdown', onPointerDown);
+window.addEventListener('pointermove', onPointerMove);
+window.addEventListener('pointerup', onPointerUp);
+renderer.domElement.addEventListener('click', onClick);
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// City panel + selection
+const cityPanel = document.getElementById('cityPanel');
+const cityName = document.getElementById('cityName');
+const cityCoords = document.getElementById('cityCoords');
+
+function selectCity(city) {
+  cityName.textContent = city.name;
+  const latDir = city.lat >= 0 ? 'N' : 'S';
+  const lonDir = city.lon >= 0 ? 'E' : 'W';
+  cityCoords.textContent = `${Math.abs(city.lat).toFixed(4)}° ${latDir}, ${Math.abs(city.lon).toFixed(4)}° ${lonDir}`;
+  cityPanel.classList.add('active');
+
+  // Rotate globe so this city faces the camera
+  const phi = (90 - city.lat) * (Math.PI / 180);
+  const theta = (city.lon + 180) * (Math.PI / 180);
+  targetRotation = {
+    y: -theta - Math.PI / 2,
+    x: (phi - Math.PI / 2),
+  };
+  autoRotate = false;
+  clearTimeout(idleTimer);
+}
+
+// Search
+const searchInput = document.getElementById('searchInput');
+const searchResults = document.getElementById('searchResults');
+
+searchInput.addEventListener('input', () => {
+  const q = searchInput.value.trim().toLowerCase();
+  searchResults.innerHTML = '';
+  if (!q) { searchResults.classList.remove('active'); return; }
+  const matches = CITIES.filter(c => c.name.toLowerCase().includes(q));
+  if (matches.length === 0) { searchResults.classList.remove('active'); return; }
+  matches.forEach(city => {
+    const item = document.createElement('div');
+    item.className = 'search-result-item';
+    item.textContent = city.name;
+    item.addEventListener('click', () => {
+      selectCity(city);
+      searchInput.value = city.name;
+      searchResults.classList.remove('active');
+    });
+    searchResults.appendChild(item);
+  });
+  searchResults.classList.add('active');
+});
+
+// Animation loop
+let pulseT = 0;
+
+function animate() {
+  requestAnimationFrame(animate);
+
+  if (autoRotate) {
+    globeGroup.rotation.y += 0.0015;
+  }
+
+  if (targetRotation) {
+    globeGroup.rotation.y += (targetRotation.y - globeGroup.rotation.y) * 0.06;
+    globeGroup.rotation.x += (targetRotation.x - globeGroup.rotation.x) * 0.06;
+    if (Math.abs(targetRotation.y - globeGroup.rotation.y) < 0.001) {
+      targetRotation = null;
+    }
+  }
+
+  velocity.x *= 0.9;
+  velocity.y *= 0.9;
+
+  pulseT += 0.05;
+  markers.forEach((m, i) => {
+    const s = 1 + Math.sin(pulseT + i * 0.6) * 0.18;
+    m.scale.setScalar(s);
+  });
+
+  renderer.render(scene, camera);
+}
+
+animate();
+</script>
+</body>
+</html>
