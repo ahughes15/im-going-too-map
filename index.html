@@ -186,7 +186,7 @@
 <div class="city-panel" id="cityPanel">
   <div class="name" id="cityName">—</div>
   <div class="coords" id="cityCoords">—</div>
-  <div class="placeholder">Vibe read will populate here once the data pipeline is connected.</div>
+  <div class="placeholder" id="cityVibeText">Vibe read will populate here once the data pipeline is connected.</div>
 </div>
 
 <div class="hint">drag to rotate<br>click a marker to select</div>
@@ -196,24 +196,37 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
 const CITIES = [
-  { name: "London", lat: 51.5074, lon: -0.1278 },
-  { name: "Los Angeles", lat: 34.0522, lon: -118.2437 },
-  { name: "Rio de Janeiro", lat: -22.9068, lon: -43.1729 },
-  { name: "Mexico City", lat: 19.4326, lon: -99.1332 },
-  { name: "Honolulu", lat: 21.3069, lon: -157.8583 },
-  { name: "Tokyo", lat: 35.6762, lon: 139.6503 },
-  { name: "Seoul", lat: 37.5665, lon: 126.9780 },
-  { name: "Cape Town", lat: -33.9249, lon: 18.4241 },
-  { name: "Barcelona", lat: 41.3851, lon: 2.1734 },
-  { name: "Mumbai", lat: 19.0760, lon: 72.8777 },
-  { name: "Dubai", lat: 25.2048, lon: 55.2708 },
-  { name: "Bangkok", lat: 13.7563, lon: 100.5018 },
-  { name: "Lagos", lat: 6.5244, lon: 3.3792 },
-  { name: "Hong Kong", lat: 22.3193, lon: 114.1694 },
-  { name: "Sydney", lat: -33.8688, lon: 151.2093 },
-  { name: "New York", lat: 40.7128, lon: -74.0060 },
-  { name: "Berlin", lat: 52.5200, lon: 13.4050 },
+  { id: "london", name: "London", lat: 51.5074, lon: -0.1278 },
+  { id: "la", name: "Los Angeles", lat: 34.0522, lon: -118.2437 },
+  { id: "rio", name: "Rio de Janeiro", lat: -22.9068, lon: -43.1729 },
+  { id: "mexico_city", name: "Mexico City", lat: 19.4326, lon: -99.1332 },
+  { id: "honolulu", name: "Honolulu", lat: 21.3069, lon: -157.8583 },
+  { id: "tokyo", name: "Tokyo", lat: 35.6762, lon: 139.6503 },
+  { id: "seoul", name: "Seoul", lat: 37.5665, lon: 126.9780 },
+  { id: "cape_town", name: "Cape Town", lat: -33.9249, lon: 18.4241 },
+  { id: "barcelona", name: "Barcelona", lat: 41.3851, lon: 2.1734 },
+  { id: "mumbai", name: "Mumbai", lat: 19.0760, lon: 72.8777 },
+  { id: "dubai", name: "Dubai", lat: 25.2048, lon: 55.2708 },
+  { id: "bangkok", name: "Bangkok", lat: 13.7563, lon: 100.5018 },
+  { id: "lagos", name: "Lagos", lat: 6.5244, lon: 3.3792 },
+  { id: "hong_kong", name: "Hong Kong", lat: 22.3193, lon: 114.1694 },
+  { id: "sydney", name: "Sydney", lat: -33.8688, lon: 151.2093 },
+  { id: "new_york", name: "New York", lat: 40.7128, lon: -74.0060 },
+  { id: "berlin", name: "Berlin", lat: 52.5200, lon: 13.4050 },
 ];
+
+// Loaded from data/vibe_reads.json once the pipeline has generated real content.
+// Keyed by city id. Cities not yet in this file just show the placeholder.
+let vibeData = {};
+
+fetch('./data/vibe_reads.json')
+  .then(res => res.json())
+  .then(entries => {
+    entries.forEach(entry => { vibeData[entry.id] = entry; });
+  })
+  .catch(() => {
+    // File doesn't exist yet, or a city has no data. Placeholder text stays as-is.
+  });
 
 const RADIUS = 2;
 
@@ -239,22 +252,28 @@ container.appendChild(renderer.domElement);
 const globeGroup = new THREE.Group();
 scene.add(globeGroup);
 
-// Wireframe sphere
-const sphereGeo = new THREE.SphereGeometry(RADIUS, 28, 20);
-const sphereMat = new THREE.MeshBasicMaterial({
+// Real Earth texture as the base sphere
+const textureLoader = new THREE.TextureLoader();
+const earthTexture = textureLoader.load(
+  'https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/planets/earth_atmos_2048.jpg'
+);
+
+const sphereGeo = new THREE.SphereGeometry(RADIUS, 48, 32);
+const sphereMat = new THREE.MeshBasicMaterial({ map: earthTexture });
+const earthSphere = new THREE.Mesh(sphereGeo, sphereMat);
+globeGroup.add(earthSphere);
+
+// Faint wireframe grid layered just above the surface, keeps the
+// "data instrument" feel without hiding the real geography underneath
+const gridGeo = new THREE.SphereGeometry(RADIUS + 0.008, 24, 16);
+const gridMat = new THREE.MeshBasicMaterial({
   color: 0x2F5EFF,
   wireframe: true,
   transparent: true,
-  opacity: 0.35,
+  opacity: 0.18,
 });
-const wireSphere = new THREE.Mesh(sphereGeo, sphereMat);
-globeGroup.add(wireSphere);
-
-// Faint solid core to help occlude back-facing markers visually
-const coreGeo = new THREE.SphereGeometry(RADIUS - 0.01, 28, 20);
-const coreMat = new THREE.MeshBasicMaterial({ color: 0x08090C, transparent: true, opacity: 0.85 });
-const core = new THREE.Mesh(coreGeo, coreMat);
-globeGroup.add(core);
+const wireGrid = new THREE.Mesh(gridGeo, gridMat);
+globeGroup.add(wireGrid);
 
 // City markers
 const markerGeo = new THREE.SphereGeometry(0.035, 12, 12);
@@ -331,6 +350,7 @@ window.addEventListener('resize', () => {
 const cityPanel = document.getElementById('cityPanel');
 const cityName = document.getElementById('cityName');
 const cityCoords = document.getElementById('cityCoords');
+const cityVibeText = document.getElementById('cityVibeText');
 
 function selectCity(city) {
   cityName.textContent = city.name;
@@ -338,6 +358,17 @@ function selectCity(city) {
   const lonDir = city.lon >= 0 ? 'E' : 'W';
   cityCoords.textContent = `${Math.abs(city.lat).toFixed(4)}° ${latDir}, ${Math.abs(city.lon).toFixed(4)}° ${lonDir}`;
   cityPanel.classList.add('active');
+
+  const entry = vibeData[city.id];
+  if (entry && entry.vibe_read) {
+    cityVibeText.textContent = entry.vibe_read;
+    cityVibeText.style.fontStyle = 'normal';
+    cityVibeText.style.color = 'var(--fg)';
+  } else {
+    cityVibeText.textContent = "Vibe read will populate here once this city's data is generated.";
+    cityVibeText.style.fontStyle = 'italic';
+    cityVibeText.style.color = 'var(--muted)';
+  }
 
   // Rotate globe so this city faces the camera
   const phi = (90 - city.lat) * (Math.PI / 180);
