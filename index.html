@@ -295,7 +295,7 @@ let prevMouse = { x: 0, y: 0 };
 let velocity = { x: 0, y: 0 };
 let autoRotate = true;
 let idleTimer = null;
-let targetRotation = null; // {x, y} when animating to a selected city
+let targetQuaternion = null; // set when animating the globe to face a selected city
 
 const raycaster = new THREE.Raycaster();
 const mouseVec = new THREE.Vector2();
@@ -303,7 +303,7 @@ const mouseVec = new THREE.Vector2();
 function onPointerDown(e) {
   isDragging = true;
   autoRotate = false;
-  targetRotation = null;
+  targetQuaternion = null;
   prevMouse = { x: e.clientX, y: e.clientY };
   clearTimeout(idleTimer);
 }
@@ -370,13 +370,19 @@ function selectCity(city) {
     cityVibeText.style.color = 'var(--muted)';
   }
 
-  // Rotate globe so this city faces the camera
+  // Rotate globe so this city faces the camera.
+  // Compute the city's direction on the sphere, then find the rotation
+  // that points that direction straight at the camera (+Z). Using a
+  // quaternion here (not manual x/y angles) avoids the wraparound bugs
+  // that caused the wrong-location jumps.
   const phi = (90 - city.lat) * (Math.PI / 180);
   const theta = (city.lon + 180) * (Math.PI / 180);
-  targetRotation = {
-    y: -theta - Math.PI / 2,
-    x: (phi - Math.PI / 2),
-  };
+  const cityDir = new THREE.Vector3(
+    -Math.sin(phi) * Math.cos(theta),
+    Math.cos(phi),
+    Math.sin(phi) * Math.sin(theta)
+  ).normalize();
+  targetQuaternion = new THREE.Quaternion().setFromUnitVectors(cityDir, new THREE.Vector3(0, 0, 1));
   autoRotate = false;
   clearTimeout(idleTimer);
 }
@@ -415,11 +421,10 @@ function animate() {
     globeGroup.rotation.y += 0.0015;
   }
 
-  if (targetRotation) {
-    globeGroup.rotation.y += (targetRotation.y - globeGroup.rotation.y) * 0.06;
-    globeGroup.rotation.x += (targetRotation.x - globeGroup.rotation.x) * 0.06;
-    if (Math.abs(targetRotation.y - globeGroup.rotation.y) < 0.001) {
-      targetRotation = null;
+  if (targetQuaternion) {
+    globeGroup.quaternion.slerp(targetQuaternion, 0.08);
+    if (globeGroup.quaternion.angleTo(targetQuaternion) < 0.001) {
+      targetQuaternion = null;
     }
   }
 
