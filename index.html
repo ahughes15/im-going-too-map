@@ -268,6 +268,8 @@
 
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js"></script>
 <script>
 const introOverlay = document.getElementById('introOverlay');
 introOverlay.addEventListener('click', () => {
@@ -331,14 +333,45 @@ container.appendChild(renderer.domElement);
 const globeGroup = new THREE.Group();
 scene.add(globeGroup);
 
-// Abstract sphere, no photorealistic texture. A solid dark core plus
-// a bold, evenly-spaced graticule (latitude/longitude grid), closer to
-// a vintage technical/astronomy diagram than a literal Earth. Structure
-// and signal only, nothing decorative.
+// Abstract sphere: real continent geography, but rendered as flat
+// silhouette shapes (cream landmass on near-black ocean) instead of a
+// photo, plus a bold graticule on top. Flat color, high contrast, no
+// gradients or lighting, closer to a Casey poster than a literal map.
+const OCEAN_COLOR = '#0B0E17';
+const LAND_COLOR = '#F2F1EA';
+
 const sphereGeo = new THREE.SphereGeometry(RADIUS, 48, 32);
-const sphereMat = new THREE.MeshBasicMaterial({ color: 0x0B0E17 });
+const sphereMat = new THREE.MeshBasicMaterial({ color: 0x0B0E17 }); // flat fallback until land loads
 const coreSphere = new THREE.Mesh(sphereGeo, sphereMat);
 globeGroup.add(coreSphere);
+
+fetch('https://cdn.jsdelivr.net/npm/world-atlas@2/land-110m.json')
+  .then(res => res.json())
+  .then(world => {
+    const land = topojson.feature(world, world.objects.land);
+    const canvas = document.createElement('canvas');
+    canvas.width = 2048;
+    canvas.height = 1024;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = OCEAN_COLOR;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    const projection = d3.geoEquirectangular().fitSize([canvas.width, canvas.height], land);
+    const path = d3.geoPath(projection, ctx);
+    ctx.beginPath();
+    path(land);
+    ctx.fillStyle = LAND_COLOR;
+    ctx.fill();
+
+    const texture = new THREE.CanvasTexture(canvas);
+    sphereMat.map = texture;
+    sphereMat.color.set(0xffffff);
+    sphereMat.needsUpdate = true;
+  })
+  .catch(err => {
+    console.error('Continent map failed to load:', err);
+    // Flat ocean-color sphere above stays as the fallback
+  });
 
 // Bold graticule, deliberately low segment count so it reads as a
 // designed diagram (clean meridians/parallels) rather than a dense mesh
@@ -347,7 +380,7 @@ const gridMat = new THREE.MeshBasicMaterial({
   color: 0x2F5EFF,
   wireframe: true,
   transparent: true,
-  opacity: 0.55,
+  opacity: 0.35,
 });
 const wireGrid = new THREE.Mesh(gridGeo, gridMat);
 globeGroup.add(wireGrid);
